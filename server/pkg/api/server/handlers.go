@@ -18,6 +18,7 @@ import (
 	"github.com/cortezaproject/corteza/server/pkg/options"
 	"github.com/cortezaproject/corteza/server/pkg/version"
 	"github.com/cortezaproject/corteza/server/webconsole"
+	"github.com/felixge/fgprof"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"
@@ -178,13 +179,15 @@ func mountServiceHandlers(r chi.Router, log *zap.Logger, opt options.HttpServerO
 }
 
 // @todo move all these routes under /console and
-//       output JSON instead of plain raw text
+//
+//	output JSON instead of plain raw text
 func mountDebugHandler(r chi.Router, log *zap.Logger) {
 	log.Debug("route debugger enabled: /__routes")
 	r.Get("/__routes", debugRoutes(r))
 
 	log.Debug("profiler enabled: /debug/pprof")
 	r.Mount("/debug", middleware.Profiler())
+	r.Handle("/debug/fgprof", fgprof.Handler())
 
 	log.Debug("eventbus handlers debug enabled: /__eventbus")
 	r.Get("/__eventbus", debugEventbus())
