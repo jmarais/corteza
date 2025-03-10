@@ -1,5 +1,5 @@
 # bundle web-console
-FROM node:16.14-alpine as webconsole-build-stage
+FROM node:16.14-alpine AS webconsole-build-stage
 
 WORKDIR /webconsole
 COPY ./webconsole ./
@@ -8,7 +8,7 @@ RUN yarn install && yarn build --mode dev --sourcemap
 
 
 # build server
-FROM golang:1.19-buster as server-build-stage
+FROM golang:1.19-buster AS server-build-stage
 
 ENV BUILD_OS=linux
 ENV BUILD_ARCH=amd64
@@ -17,6 +17,10 @@ ENV BUILD_VERSION=latest
 WORKDIR /corteza
 
 COPY . ./
+
+RUN echo "$PWD"
+RUN ls
+RUN ls ./webapp/
 
 COPY --from=webconsole-build-stage /webconsole/dist ./webconsole/dist
 RUN make release-clean release
