@@ -69,8 +69,8 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/tidwall/btree v1.3.1
 	github.com/valyala/fastjson v1.6.3
-	go.uber.org/atomic v1.9.0
-	go.uber.org/zap v1.21.0
+	go.uber.org/atomic v1.10.0
+	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.19.0
 	golang.org/x/image v0.15.0
 	golang.org/x/net v0.21.0
@@ -134,9 +134,11 @@ require (
 	github.com/russellhaering/goxmldsig v1.4.0 // indirect
 	github.com/rwcarlsen/goexif v0.0.0-20190401172101-9e8deecbddbd // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
+	github.com/simukti/sqldb-logger v0.0.0-20230108155151-646c1a075551 // indirect
+	github.com/simukti/sqldb-logger/logadapter/zapadapter v0.0.0-20230108155151-646c1a075551 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/valyala/fasthttp v1.35.0 // indirect
-	go.uber.org/multierr v1.7.0 // indirect
+	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/sys v0.17.0 // indirect
 	golang.org/x/term v0.17.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect

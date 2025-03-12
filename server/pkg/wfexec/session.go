@@ -503,6 +503,7 @@ func (s *Session) worker(ctx context.Context) {
 
 			// add empty struct to chan to lock and to have control over number of concurrent go processes
 			// this will block if number of items in execLock chan reached value of sessionConcurrentExec
+			// 32 len channel
 			s.execLock <- struct{}{}
 
 			go func() {
