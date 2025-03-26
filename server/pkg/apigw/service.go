@@ -2,10 +2,12 @@ package apigw
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
+	"time"
+
+	"github.com/goccy/go-json"
 
 	"github.com/cortezaproject/corteza/server/pkg/apigw/filter"
 	"github.com/cortezaproject/corteza/server/pkg/apigw/filter/proxy"
@@ -202,12 +204,14 @@ func (s *apigw) PrepRoutes(ctx context.Context, routes ...*route) {
 	}
 
 	for _, r := range routes {
+		startr := time.Now()
 		var (
 			log  = s.log.With(zap.String("route", r.String()))
 			pipe = pipeline.NewPipeline(log, chain.NewDefault())
 
 			regFilters []*st.ApigwFilter
 		)
+		log.Debug("start", zap.String("at", startr.String()))
 
 		// pipeline needs to know how to handle
 		// async processers
@@ -222,6 +226,7 @@ func (s *apigw) PrepRoutes(ctx context.Context, routes ...*route) {
 			log.Error("could not load filters for route", zap.Error(err))
 			continue
 		}
+		log.Debug("loaded filters", zap.String("duration", time.Since(startr).String()))
 
 		for _, rf := range regFilters {
 			flog := log.With(zap.String("ref", rf.Ref))
@@ -242,8 +247,9 @@ func (s *apigw) PrepRoutes(ctx context.Context, routes ...*route) {
 
 			pipe.Add(ff)
 
-			flog.Debug("registered filter")
+			flog.Debug("registered filter", zap.String("duration", time.Since(startr).String()))
 		}
+		log.Debug("registered all filters", zap.String("duration", time.Since(startr).String()))
 
 		// add default postfilter on async
 		// routes if not present
@@ -256,12 +262,14 @@ func (s *apigw) PrepRoutes(ctx context.Context, routes ...*route) {
 				Type:    types.PostFilter,
 				Weight:  math.MaxInt8,
 			})
+			log.Debug("assigned default postfilter", zap.String("duration", time.Since(startr).String()))
 		}
 
 		r.handler = pipe.Handler()
+		log.Debug("assigned pipe handler", zap.String("duration", time.Since(startr).String()))
 		r.errHandler = pipe.Error()
 
-		log.Debug("successfully registered route")
+		log.Debug("successfully registered route", zap.String("duration", time.Since(startr).String()))
 	}
 }
 

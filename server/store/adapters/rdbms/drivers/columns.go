@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+
 	"github.com/cortezaproject/corteza/server/pkg/dal"
 	"github.com/cortezaproject/corteza/server/pkg/errors"
 	"github.com/spf13/cast"
@@ -159,6 +160,8 @@ func (c *SimpleJsonDocColumn) Encode(r dal.ValueGetter) (_ any, err error) {
 	return json.Marshal(aux)
 }
 
+var pp fastjson.ParserPool
+
 func (c *SimpleJsonDocColumn) Decode(raw any, r dal.ValueSetter) (err error) {
 	rawJson, is := raw.(*sql.RawBytes)
 	if !is {
@@ -176,8 +179,9 @@ func (c *SimpleJsonDocColumn) Decode(raw any, r dal.ValueSetter) (err error) {
 		v           string
 		obj         *fastjson.Object
 	)
-
-	if root, err = fastjson.ParseBytes(*rawJson); err != nil {
+	jp := pp.Get()
+	defer pp.Put(jp)
+	if root, err = jp.ParseBytes(*rawJson); err != nil {
 		return
 	}
 

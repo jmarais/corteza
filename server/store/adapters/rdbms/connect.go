@@ -8,8 +8,9 @@ import (
 
 	"github.com/cortezaproject/corteza/server/pkg/sentry"
 	"github.com/jmoiron/sqlx"
-	sqldblogger "github.com/simukti/sqldb-logger"
-	"github.com/simukti/sqldb-logger/logadapter/zapadapter"
+
+	// sqldblogger "github.com/simukti/sqldb-logger"
+	// "github.com/simukti/sqldb-logger/logadapter/zapadapter"
 	"go.uber.org/zap"
 )
 
@@ -41,12 +42,12 @@ func Connect(ctx context.Context, log *zap.Logger, cfg *ConnConfig) (db *sqlx.DB
 	if base, err = sql.Open(cfg.DriverName, cfg.DataSourceName); err != nil {
 		return
 	}
-	base = sqldblogger.OpenDriver(
-		cfg.DataSourceName,
-		base.Driver(),
-		zapadapter.New(log),
-		// optional config...
-	)
+	// base = sqldblogger.OpenDriver(
+	// 	cfg.DataSourceName,
+	// 	base.Driver(),
+	// 	zapadapter.New(log),
+	// 	// optional config...
+	// )
 
 	db = sqlx.NewDb(base, cfg.DriverName)
 	log.Debug(

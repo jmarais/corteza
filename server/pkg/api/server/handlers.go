@@ -166,6 +166,30 @@ func mountServiceHandlers(r chi.Router, log *zap.Logger, opt options.HttpServerO
 
 	if opt.EnableDebugRoute {
 		mountDebugHandler(r, log)
+
+		log.Debug("query handler debug enabled: /__extras")
+		path := "/__extras"
+		r.Route(path, func(r chi.Router) {
+			if len(opt.WebConsolePassword) > 0 {
+				credentials := map[string]string{
+					opt.WebConsoleUsername: opt.WebConsolePassword,
+				}
+				r.Use(middleware.BasicAuth("web-console", credentials))
+			} else {
+				// warn only in waiting state to avoid repeated log messages
+				if state == waiting {
+					// warn the user regardless of what environment Corteza is running in.
+					log.Warn("SECURITY RISK: web console is enabled and unprotected, set " +
+						"HTTP_SERVER_WEB_CONSOLE_USERNAME, HTTP_SERVER_WEB_CONSOLE_PASSWORD " +
+						"if not running in development environment!")
+				}
+			}
+
+			r.Get("/queries/values", debugQueries())
+			r.Get("/sessions", debugSessions())
+			r.Get("/sessions/{sessionID}/cancel", cancelSessions())
+			r.Get("/sessions/cancelall", cancelallSessions())
+		})
 	}
 
 	if opt.EnableVersionRoute {

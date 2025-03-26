@@ -1,6 +1,8 @@
 package wfexec
 
 import (
+	"fmt"
+	"io"
 	"time"
 
 	"github.com/cortezaproject/corteza/server/pkg/expr"
@@ -45,6 +47,25 @@ func Prompt(ownerId uint64, ref string, payload *expr.Vars) *prompted {
 	return &prompted{payload: payload, ref: ref, ownerId: ownerId}
 }
 
+func (p *prompted) PPrint(w io.Writer) {
+	fmt.Fprintf(w, "<td>%d</td>", p.ownerId)
+	fmt.Fprintf(w, "<td>%s</td>", p.ref)
+	fmt.Fprintf(w, "<td>%s</td>", p.state.created)
+	fmt.Fprintf(w, "<td>%d</td>", p.state.stateId)
+	if p.state.parent != nil {
+		fmt.Fprintf(w, "<td>%d</td>", p.state.parent.ID())
+	} else {
+		fmt.Fprintf(w, "<td></td>")
+	}
+	fmt.Fprintf(w, "<td>%d</td>", p.state.step.ID())
+	if len(p.state.next) > 0 {
+		fmt.Fprintf(w, "<td>%d</td>", p.state.next[0].ID())
+	} else {
+		fmt.Fprintf(w, "<td></td>")
+	}
+	fmt.Fprintf(w, "<td>%s</td>", p.state.action)
+
+}
 func (p *prompted) toPending() *PendingPrompt {
 	return &PendingPrompt{
 		Ref:       p.ref,

@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -113,12 +114,12 @@ type (
 )
 
 const (
-	SessionStarted SessionStatus = iota
-	SessionPrompted
-	SessionSuspended
-	SessionFailed
-	SessionCompleted
-	SessionCanceled
+	SessionStarted   SessionStatus = iota // 0
+	SessionPrompted                       //1
+	SessionSuspended                      //2
+	SessionFailed                         //3
+	SessionCompleted                      //4
+	SessionCanceled                       //5
 )
 
 func NewSession(s *wfexec.Session) *Session {
@@ -126,6 +127,9 @@ func NewSession(s *wfexec.Session) *Session {
 		ID:      s.ID(),
 		session: s,
 	}
+}
+func (s *Session) SessionPrint(w io.Writer) {
+	s.session.SessionPrint(w)
 }
 
 func (s *Session) DisableStacktrace() {
@@ -160,6 +164,8 @@ func (s *Session) GC() bool {
 	return s.CompletedAt != nil ||
 		s.Status == SessionCanceled ||
 		s.session.Error() != nil
+	// s.session.Error() != nil ||
+	// s.session.StuckPrompt()
 }
 
 // WaitResults wait blocks until workflow session is completed or fails (or context is canceled) and returns resuts

@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/cortezaproject/corteza/server/automation/rest/request"
+	"github.com/cortezaproject/corteza/server/automation/service"
 	"github.com/cortezaproject/corteza/server/pkg/corredor"
 	"github.com/cortezaproject/corteza/server/pkg/eventbus"
+	"github.com/cortezaproject/corteza/server/store/adapters/rdbms/dal"
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/go-chi/chi/v5"
@@ -47,4 +50,40 @@ func debugCorredor() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		spew.Fdump(w, corredor.Service().Debug())
 	}
+}
+
+func debugSessions() http.HandlerFunc {
+	return service.DefaultSession.DebugHandler
+}
+
+func cancelSessions() http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		params := request.NewSessionCancel()
+		if err := params.Fill(req); err != nil {
+			fmt.Fprintf(w, "%s\n", err.Error())
+			return
+		}
+
+		err := service.DefaultSession.ForceCancel(req.Context(), params.SessionID)
+		if err != nil {
+			fmt.Fprintf(w, "%s\n", err.Error())
+			return
+		}
+		fmt.Fprintf(w, "success!\n")
+	}
+}
+
+func cancelallSessions() http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		err := service.DefaultSession.ForceCancelAll(req.Context())
+		if err != nil {
+			fmt.Fprintf(w, "%s\n", err.Error())
+			return
+		}
+		fmt.Fprintf(w, "success!\n")
+	}
+}
+
+func debugQueries() http.HandlerFunc {
+	return dal.HandleDebugQueries
 }

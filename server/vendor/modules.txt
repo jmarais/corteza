@@ -437,10 +437,8 @@ github.com/rwcarlsen/goexif/tiff
 github.com/shopspring/decimal
 # github.com/simukti/sqldb-logger v0.0.0-20230108155151-646c1a075551
 ## explicit; go 1.17
-github.com/simukti/sqldb-logger
 # github.com/simukti/sqldb-logger/logadapter/zapadapter v0.0.0-20230108155151-646c1a075551
 ## explicit; go 1.17
-github.com/simukti/sqldb-logger/logadapter/zapadapter
 # github.com/sony/sonyflake v1.0.0
 ## explicit; go 1.12
 github.com/sony/sonyflake

@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"sort"
 	"sync"
 	"time"
 
@@ -303,6 +305,33 @@ func (svc *session) Cancel(ctx context.Context, sessionID uint64) (err error) {
 	return nil
 }
 
+// NOTE: THIS IS A HACK FOR DEBUGGING
+func (svc *session) ForceCancel(ctx context.Context, sessionID uint64) (err error) {
+	svc.mux.RLock()
+	var (
+		ses = svc.pool[sessionID]
+	)
+	svc.mux.RUnlock()
+
+	if ses == nil {
+		return errors.NotFound("session not found or already canceled")
+	}
+
+	ses.Cancel()
+	return nil
+}
+
+// NOTE: THIS IS A HACK FOR DEBUGGING
+func (svc *session) ForceCancelAll(ctx context.Context) (err error) {
+	for _, s := range svc.pool {
+		if s == nil {
+			continue
+		}
+		s.Cancel()
+	}
+	return nil
+}
+
 // spawns a new session
 //
 // We need initial context for the session because we want to catch all cancellations or timeouts from there
@@ -423,13 +452,15 @@ func (svc *session) logPending() {
 		pending, pending1m, pending1h, pending1d int
 	)
 
+	n := now()
 	for _, s := range svc.pool {
+		since := n.Sub(s.CreatedAt)
 		switch {
-		case s.CreatedAt.Sub(*now()) > time.Hour*24:
+		case since > time.Hour*24:
 			pending1d++
-		case s.CreatedAt.Sub(*now()) > time.Hour:
+		case since > time.Hour:
 			pending1h++
-		case s.CreatedAt.Sub(*now()) > time.Minute:
+		case since > time.Minute:
 			pending1m++
 		default:
 			pending++
@@ -446,6 +477,115 @@ func (svc *session) logPending() {
 			zap.Int("pending1d", pending1d),
 		)
 	}
+
+}
+func (svc *session) DebugHandler(w http.ResponseWriter, req *http.Request) {
+	svc.mux.RLock()
+	defer svc.mux.RUnlock()
+	var (
+		total = len(svc.pool)
+	)
+	fmt.Fprint(w, `
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+tr:nth-child(even) {
+	background-color: #E7E9EB;
+}
+th, td {
+	border: 1px solid #dddddd;
+	text-align: left;
+	padding: 8px; 
+	white-space: nowrap; /* Prevents wrapping for better fitting */
+}
+table {
+	font-family: arial, sans-serif;
+	border-collapse: collapse;
+	width: 100%;
+	table-layout: auto; /* Ensures columns adjust to content */
+	width: auto; /* Allows the table to shrink to fit content */
+}
+</style>
+</head>
+<body>
+`)
+	fmt.Fprintf(w, "<h1>session debug info</h1>")
+	fmt.Fprintf(w, "<h2>total sessions: %d</h2>", total)
+	fmt.Fprintf(w, "<h3><a target=\"_blank\" href=\"https://%s/__extras/sessions/cancelall\">Cancel ALL session</a></h3>", req.Host)
+	fmt.Fprintf(w, "<hr>")
+	perworkflow := make(map[uint64][]*types.Session)
+	for _, s := range svc.pool {
+		a := s
+		perworkflow[a.WorkflowID] = append(perworkflow[a.WorkflowID], a)
+	}
+	keys := make([]uint64, 0, len(svc.pool))
+	for k := range perworkflow {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	nn := now()
+	for _, key := range keys {
+		wf := key
+		ss := perworkflow[key]
+
+		fmt.Fprintf(w, "<h2>workflowID %d</h2><h3>num sessions: %d</h3>", wf, len(ss))
+		fmt.Fprintf(w, "<table id=\"%d\">", wf)
+
+		fmt.Fprintf(w, `<tr>
+			<th>#</th>
+			<th>cancel</th>
+			<th>session id</th>
+			<th>status</th>
+			<th>event type</th>
+			<th>resource type</th>
+			<th>created by</th>
+			<th>created at</th>
+			<th>age</th>
+			<th>purge at</th>
+			<th>suspended at</th>
+			<th>completed at</th>
+			<th>flush counter</th>
+			<th>delayed count</th>
+			<th>prompted count</th>
+			<th>prompt owner id</th>
+			<th>prompt ref</th>
+			<th>prompt state created</th>
+			<th>prompt state id</th>
+			<th>prompt parent step</th>
+			<th>prompt current step</th>
+			<th>prompt next step</th>
+			<th>prompt state action</th>
+			<th>error</th>
+			</tr>`)
+		sort.Slice(ss, func(i, j int) bool { return ss[i].ID < ss[j].ID })
+		for si, s := range ss {
+			fmt.Fprintf(w, `<tr>`)
+			// maybe cancel link
+			fmt.Fprintf(w, "<td>%d</td>", si)
+			fmt.Fprintf(w, "<td><a target=\"_blank\" href=\"https://%s/__extras/sessions/%d/cancel\">cancel</a></td>", req.Host, s.ID)
+			fmt.Fprintf(w, "<td>%d</td>", s.ID)
+			fmt.Fprintf(w, "<td>%s</td>", s.Status.String())
+			fmt.Fprintf(w, "<td>%s</td>", s.EventType)
+			fmt.Fprintf(w, "<td>%s</td>", s.ResourceType)
+			fmt.Fprintf(w, "<td>%d</td>", s.CreatedBy)
+			fmt.Fprintf(w, "<td>%s</td>", s.CreatedAt)
+			fmt.Fprintf(w, "<td>%s</td>", nn.Sub(s.CreatedAt))
+			fmt.Fprintf(w, "<td>%s</td>", s.PurgeAt)
+			fmt.Fprintf(w, "<td>%s</td>", s.SuspendedAt)
+			fmt.Fprintf(w, "<td>%s</td>", s.CompletedAt)
+			// fmt.Fprintf(w, "<td>%s</td>", s.Error)
+			fmt.Fprintf(w, "<td>%d</td>", s.FlushCounter)
+			s.SessionPrint(w)
+			fmt.Fprintf(w, `</tr>`)
+		}
+		fmt.Fprintf(w, "</table>")
+		fmt.Fprintf(w, "<hr><hr>")
+	}
+	fmt.Fprintf(w, `
+</body>
+</html>
+`)
 }
 
 // stateChangeHandler keeps track of session status changes and frequently stores session into db

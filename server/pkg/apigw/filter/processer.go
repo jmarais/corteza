@@ -3,10 +3,11 @@ package filter
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/goccy/go-json"
 
 	"github.com/cortezaproject/corteza/server/automation/automation"
 	atypes "github.com/cortezaproject/corteza/server/automation/types"

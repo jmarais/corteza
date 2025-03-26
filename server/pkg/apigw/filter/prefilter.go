@@ -2,10 +2,11 @@ package filter
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/goccy/go-json"
 
 	agctx "github.com/cortezaproject/corteza/server/pkg/apigw/ctx"
 	"github.com/cortezaproject/corteza/server/pkg/apigw/types"

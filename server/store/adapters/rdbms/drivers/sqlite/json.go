@@ -2,10 +2,11 @@ package sqlite
 
 import (
 	"fmt"
-	"github.com/doug-martin/goqu/v9/exp"
-	"github.com/valyala/fastjson"
 	"strconv"
 	"strings"
+
+	"github.com/doug-martin/goqu/v9/exp"
+	"github.com/valyala/fastjson"
 )
 
 // DeepIdentJSON constructs expression with chain of JSON operators
@@ -67,10 +68,14 @@ func jsonPath(pp ...any) (string, error) {
 	return sql.String(), nil
 }
 
+var pp fastjson.ParserPool
+
 func sqliteFuncJsonArrayContains(needle, haystack []byte) (_ bool, err error) {
 	var n, h, i *fastjson.Value
+	jp := pp.Get()
+	defer pp.Put(jp)
 
-	if h, err = fastjson.ParseBytes(haystack); err != nil {
+	if h, err = jp.ParseBytes(haystack); err != nil {
 		return
 	}
 
@@ -79,7 +84,7 @@ func sqliteFuncJsonArrayContains(needle, haystack []byte) (_ bool, err error) {
 		return
 	}
 
-	if n, err = fastjson.ParseBytes(needle); err != nil {
+	if n, err = jp.ParseBytes(needle); err != nil {
 		return
 	}
 

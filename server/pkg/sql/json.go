@@ -1,8 +1,9 @@
 package sql
 
 import (
-	"encoding/json"
 	"fmt"
+
+	"github.com/goccy/go-json"
 )
 
 func ParseJSON(raw any, dest any) error {

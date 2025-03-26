@@ -2,10 +2,11 @@ package types
 
 import (
 	"database/sql/driver"
-	"encoding/json"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/goccy/go-json"
 
 	"github.com/cortezaproject/corteza/server/pkg/sql"
 	"github.com/modern-go/reflect2"

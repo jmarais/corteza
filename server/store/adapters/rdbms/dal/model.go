@@ -4,7 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/http"
+	"regexp"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/cortezaproject/corteza/server/pkg/errors"
 	"github.com/modern-go/reflect2"
@@ -17,6 +21,189 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jmoiron/sqlx"
 )
+
+func HandleDebugQueries(w http.ResponseWriter, req *http.Request) {
+	qcachelock.Lock()
+	defer qcachelock.Unlock()
+	fmt.Fprint(w, `
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+tr:nth-child(even) {
+	background-color: #E7E9EB;
+}
+th, td {
+	border: 1px solid #dddddd;
+	text-align: left;
+	padding: 8px; 
+	white-space: nowrap; /* Prevents wrapping for better fitting */
+}
+th {
+	cursor: pointer; /* Makes it clear the header is clickable */
+}
+th:hover {
+	background-color: darkgray;
+}
+.arrow {
+	margin-left: 8px;
+	display: inline-block;
+	width: 12px;  /* Ensures consistent spacing */
+	text-align: center;
+	visibility: hidden; /* Default state is hidden */
+}
+th[data-sort-order] .arrow {
+	visibility: visible; /* Show arrow only when sorted */
+}
+table {
+	font-family: arial, sans-serif;
+	border-collapse: collapse;
+	width: 100%;
+	table-layout: auto; /* Ensures columns adjust to content */
+	width: auto; /* Allows the table to shrink to fit content */
+}
+</style>
+</head>
+<body>
+`)
+	fmt.Fprint(w, `
+<script>
+	function sortTable(columnIndex, type, thElement) {
+		let table = document.getElementById("jsonquerylist");
+		let rows = Array.from(table.rows).slice(1); // Exclude the header
+		let isAscending = thElement.dataset.sortOrder !== "asc"; // Toggle sorting order
+
+		// Sort rows
+		rows.sort((rowA, rowB) => {
+			let cellA = rowA.cells[columnIndex].innerText.trim();
+			let cellB = rowB.cells[columnIndex].innerText.trim();
+
+			if (type === "number") {
+				return isAscending ? cellA - cellB : cellB - cellA;
+			} else {
+				return isAscending ? cellA.localeCompare(cellB) : cellB.localeCompare(cellA);
+			}
+		});
+
+		rows.forEach(row => table.appendChild(row)); // Reorder rows
+
+		// Update all headers to remove previous arrows
+		document.querySelectorAll(".arrow").forEach(span => span.innerText = "");
+
+		// Update arrow in the clicked header
+		thElement.dataset.sortOrder = isAscending ? "asc" : "desc";
+		thElement.querySelector(".arrow").innerText = isAscending ? " ▲" : " ▼";
+	}
+</script>
+`)
+	fmt.Fprintf(w, "<h1>JSON values query list</h1>\n")
+	fmt.Fprintf(w, "<h2>query count: %d</h2>", len(qcache))
+	fmt.Fprintf(w, "<hr>")
+	fmt.Fprintf(w, "<table id=\"%s\">", "jsonquerylist")
+	fmt.Fprintf(w, `<tr>
+			<th onclick="sortTable(0, 'number',this)" data-sort-order="desc">count<span class="arrow"> ▼</span></th>
+			<th onclick="sortTable(1, 'text',this)" data-sort-order="desc">table<span class="arrow"></span></th>
+			<th onclick="sortTable(2, 'text',this)" data-sort-order="asc">values<span class="arrow"></span></th>
+			<th onclick="sortTable(3, 'text',this)" data-sort-order="desc">query<span class="arrow"></span></th>
+			<th onclick="sortTable(4, 'text',this)">args<span class="arrow"></span></th>
+			</tr>`)
+	qmetas := make([]*qmeta, 0, len(qcache))
+	for _, qq := range qcache {
+		a := qq
+		qmetas = append(qmetas, a)
+	}
+	sort.Slice(qmetas, func(i int, j int) bool {
+		if qmetas[i].count == qmetas[j].count {
+			return qmetas[i].query < qmetas[j].query
+		}
+		return qmetas[i].count > qmetas[j].count
+	})
+	for _, aa := range qmetas {
+		qq := aa
+		cls := qq.q.GetClauses()
+		clsFrom := cls.From()
+		fcols := make(map[string]struct{})
+		for _, f := range clsFrom.Columns() {
+			ff := f.(exp.IdentifierExpression)
+			t := ff.GetCol().(string)
+			if t != "" {
+				fcols[t] = struct{}{}
+			}
+			t2 := ff.GetTable()
+			if t2 != "" {
+				fcols[t2] = struct{}{}
+			}
+		}
+		mm := re.FindAllSubmatch([]byte(qq.query), -1)
+		ffields := make(map[string]struct{})
+		for _, m := range mm {
+			for _, n := range m[1:] {
+				if len(n) > 0 {
+					ffields[string(n)] = struct{}{}
+				}
+			}
+		}
+		keys := []string{}
+		for k := range fcols {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		scols := strings.Join(keys, ",")
+		keys = []string{}
+		for k := range ffields {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		sfields := strings.Join(keys, ",")
+
+		fmt.Fprintf(w, `<tr>`)
+		fmt.Fprintf(w, "<td>%d</td>", qq.count)
+		fmt.Fprintf(w, "<td>%s</td>", scols)
+		fmt.Fprintf(w, "<td>%s</td>", sfields)
+		fmt.Fprintf(w, "<td>%s</td>", qq.query)
+		fmt.Fprintf(w, "<td>%v</td>", qq.args)
+		fmt.Fprintf(w, `</tr>`)
+	}
+	fmt.Fprintf(w, "</table>")
+	fmt.Fprintf(w, `
+</body>
+</html>
+`)
+	// cls := ssqll.GetClauses()
+	// clsFrom := cls.From()
+	// for _, f := range clsFrom.Columns() {
+	// 	fmt.Printf("clauses from: %#v\n", f)
+	// }
+	// for _, f := range cls.Where().Expressions() {
+	// 	fmt.Printf("clauses where: %#v\n", f)
+	// }
+
+}
+
+func logquery(s *goqu.SelectDataset) {
+	ss := s.Clone().(*goqu.SelectDataset)
+
+	qcachelock.Lock()
+	defer qcachelock.Unlock()
+	query, args, _ := ss.ToSQL()
+
+	m, ok := qcache[query]
+	if !ok {
+		m = &qmeta{ss, query, args, 0}
+		qcache[query] = m
+	}
+	m.count++
+}
+
+type qmeta struct {
+	q     *goqu.SelectDataset
+	query string
+	args  []any
+	count int
+}
+
+var qcache = make(map[string]*qmeta)
+var qcachelock = sync.Mutex{}
 
 type (
 	queryRunner interface {
@@ -261,6 +448,11 @@ func (d *model) Search(f filter.Filter) (i *iterator, err error) {
 	}
 
 	i.query = d.applyFiltersToQuery(d.selectSql(), f)
+	tquery, _, _ := i.query.ToSQL()
+	if strings.Contains(tquery, `values"->`) {
+		logquery(i.query)
+	}
+
 	if err = i.query.Error(); err != nil {
 		return
 	}
@@ -324,10 +516,17 @@ func (d *model) Aggregate(f filter.Filter, groupBy []dal.AggregateAttr, aggrExpr
 	return
 }
 
+// var re = regexp.MustCompile(`"values"->'(.*?)'|FROM "(.*)" WHERE`)
+var re = regexp.MustCompile(`"values"->'(.*?)'`)
+
 func (d *model) Lookup(ctx context.Context, pkv dal.ValueGetter, r dal.ValueSetter) (err error) {
-	query, args, err := d.lookupSql(pkv).ToSQL()
+	ssqll := d.lookupSql(pkv)
+	query, args, err := ssqll.ToSQL()
 	if err != nil {
 		return
+	}
+	if strings.Contains(query, `values"->`) {
+		logquery(ssqll)
 	}
 
 	// using sql.Rows instead of a row
