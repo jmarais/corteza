@@ -64,9 +64,10 @@ func New() *eventbus {
 // It waits for each handler and fails on first error
 func (b *eventbus) WaitFor(ctx context.Context, ev Event) (err error) {
 	b.l.RLock()
-	defer b.l.RUnlock()
+	handlers := b.find(ev)
+	b.l.RUnlock()
 
-	for _, t := range b.find(ev) {
+	for _, t := range handlers {
 		err = func(ctx context.Context, t *handler) error {
 			b.wg.Add(1)
 			defer b.wg.Done()
@@ -104,7 +105,7 @@ func (b *eventbus) wait() {
 
 // Finds all registered handlers compatible with given event
 //
-// It returns sorted handlers
+// # It returns sorted handlers
 //
 // There is still room for improvement (performance wise) by indexing
 // resources and events of each handler.
