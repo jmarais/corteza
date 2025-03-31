@@ -1,3 +1,25 @@
+NOTE: This branch adds two debug endpoints at:
+/__extras/sesisons
+/__extras/queries/values
+
+This was used to debug corteza workflows and JSON queries sent to the DB.
+
+Example of the sessions UI:
+<div align="center">
+  <img src="corteza_debug_sessions.png">
+</div>
+
+The sessions debug page was used to view current running workflow sessions in order to spot which workflows are 'stuck' prompting for system users (users who will never interact with the prompt).
+
+Example of the query UI:
+<div align="center">
+  <img src="corteza_debug_queries.png">
+</div>
+
+The query UI was used to determine the JSON values queries corteza was submitting to the DB. From the DB you can not see which JSON fields are being queries since it is all parameter queries. This page was added in order to see which models and fields are used in JSON queries, and to see the query count of those queries.
+It is possible to configure those fields to DB columns in corteza, however historical data will have to be manually migrated in order to work correctly.
+
+
 <h1 align="center">
   <img width="300px" src=".github/assets/corteza_logo.svg" />
   <br />
