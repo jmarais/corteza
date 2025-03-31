@@ -164,8 +164,6 @@ func (s *Session) GC() bool {
 	return s.CompletedAt != nil ||
 		s.Status == SessionCanceled ||
 		s.session.Error() != nil
-	// s.session.Error() != nil ||
-	// s.session.StuckPrompt()
 }
 
 // WaitResults wait blocks until workflow session is completed or fails (or context is canceled) and returns resuts

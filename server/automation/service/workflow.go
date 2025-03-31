@@ -759,12 +759,6 @@ func makeWorkflowHandler(svc *workflow, wf *types.Workflow, t *types.Trigger) ev
 				return
 			}
 		}
-		// jsob, _ := scope.MarshalJSON()
-
-		// if t.StepID == uint64(83) {
-		// 	fmt.Printf("TRIGGER EVENT:: resourceType %s, eventtype %s, wfid: %d, stepid %d\nSCOPE: %s\n\n\n",
-		// 		ev.ResourceType(), ev.EventType(), t.WorkflowID, t.StepID, string(jsob))
-		// }
 		wait, _, err := svc.exec(ctx, wf, types.WorkflowExecParams{
 			StepID:       t.StepID,
 			EventType:    t.EventType,

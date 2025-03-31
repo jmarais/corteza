@@ -15,10 +15,6 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	timeoutAfterNoStateChanges = time.Minute * 30
-)
-
 type (
 	Session struct {
 		// Session identifier
@@ -30,8 +26,6 @@ type (
 		g *Graph
 
 		started time.Time
-
-		lastStateChange time.Time
 
 		// state channel (ie work queue)
 		qState chan *State
@@ -170,15 +164,14 @@ func (s SessionStatus) String() string {
 func NewSession(ctx context.Context, g *Graph, oo ...SessionOpt) *Session {
 	n := *now()
 	s := &Session{
-		g:               g,
-		id:              nextID(),
-		started:         n,
-		lastStateChange: n,
-		qState:          make(chan *State, sessionStateChanBuf),
-		qErr:            make(chan error, 20),
-		execLock:        make(chan struct{}, sessionConcurrentExec),
-		delayed:         make(map[uint64]*delayed),
-		prompted:        make(map[uint64]*prompted),
+		g:        g,
+		id:       nextID(),
+		started:  n,
+		qState:   make(chan *State, sessionStateChanBuf),
+		qErr:     make(chan error, 20),
+		execLock: make(chan struct{}, sessionConcurrentExec),
+		delayed:  make(map[uint64]*delayed),
+		prompted: make(map[uint64]*prompted),
 
 		// Setting this one to something higher since it'll need external interaction
 		workerIntervalSuspended: time.Millisecond * 100,
@@ -467,23 +460,6 @@ func (s *Session) WaitUntil(ctx context.Context, expected ...SessionStatus) erro
 	}
 }
 
-var maxPromptDuration = time.Minute * 10
-
-func (s *Session) StuckPrompt() bool {
-	s.mux.Lock()
-	sincelastchange := time.Since(s.lastStateChange)
-	promptState := len(s.prompted) > 0
-	s.mux.Unlock()
-	if sincelastchange > maxPromptDuration {
-		if promptState {
-			s.qErr <- errCanceled
-			return true
-		}
-	}
-	return false
-
-}
-
 func (s *Session) worker(ctx context.Context) {
 	defer s.Stop()
 
@@ -505,9 +481,6 @@ func (s *Session) worker(ctx context.Context) {
 
 		case st := <-s.qState:
 			s.log.Debug("pulled state from queue", logger.Uint64("stateID", st.stateId))
-			s.mux.Lock()
-			s.lastStateChange = *now()
-			s.mux.Unlock()
 			if st.step == nil {
 				// When there are any suspended steps we shouldn't kill the worker
 				// as those need to be processed.
@@ -869,20 +842,6 @@ func (s *Session) exec(ctx context.Context, log *zap.Logger, st *State) (nxt []*
 			if result.ownerId == 0 {
 				return nil, fmt.Errorf("without an owner")
 			}
-			// var jsb []byte
-			// if result.payload != nil {
-			// 	jsb, _ = result.payload.MarshalJSON()
-			// }
-			// fmt.Printf("sesid: %d - prompted state\n"+
-			// 	"stateid:%d\n"+
-			// 	"stateowner:%s\n"+
-			// 	"resultpayload: %s\n",
-			// 	s.id,
-			// 	st.stateId,
-			// 	st.owner.String(),
-			// string(jsb),
-			// )
-
 			result.state = st
 			s.mux.Lock()
 			s.prompted[st.stateId] = result
